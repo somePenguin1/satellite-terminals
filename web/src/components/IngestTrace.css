@@ -1,0 +1,53 @@
+.ingest-trace {
+  border-top: 1px solid var(--rule);
+  padding: var(--space-3) var(--space-4) 0;
+}
+
+.trace-readout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-5);
+  font-size: var(--step--1);
+  margin-bottom: var(--space-1);
+}
+
+.trace-readout strong {
+  font-size: var(--step-1);
+  font-weight: 650;
+  font-stretch: 112%;
+}
+
+.trace-scale {
+  margin-left: auto;
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--offline);
+}
+
+.live-dot.open {
+  background: var(--healthy);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--healthy) 22%, transparent);
+}
+
+.live-dot.connecting {
+  background: var(--degraded);
+}
+
+.trace-base {
+  stroke: var(--rule);
+}
+
+.trace-area {
+  fill: color-mix(in srgb, var(--ink) 9%, transparent);
+}
+
+.trace-line {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}

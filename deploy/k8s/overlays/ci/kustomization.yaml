@@ -1,0 +1,31 @@
+# Used by CD to deploy into an ephemeral kind cluster and smoke-test the release.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+patches:
+  - target: { kind: Deployment, name: fleet-api }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target: { kind: Deployment, name: web }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target: { kind: HorizontalPodAutoscaler, name: ingest }
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+  - target: { kind: Deployment, name: ingest }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target: { kind: StatefulSet, name: postgres }
+    patch: |-
+      - op: replace
+        path: /spec/volumeClaimTemplates/0/spec/resources/requests/storage
+        value: 1Gi

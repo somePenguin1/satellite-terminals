@@ -1,0 +1,25 @@
+# Real C agents for SAT-00001 and SAT-00002. The StatefulSet ordinal (agent-0, agent-1)
+# gives each pod a stable terminal identity, like a serial burned into hardware.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: agent
+spec:
+  serviceName: agent
+  replicas: 2
+  selector:
+    matchLabels: { app: agent }
+  template:
+    metadata:
+      labels: { app: agent }
+    spec:
+      containers:
+        - name: agent
+          image: satfleet/agent
+          command: ["/bin/sh", "-c"]
+          args:
+            - exec satfleet-agent --id "$$(printf 'SAT-%05d' $$(( $${HOSTNAME##*-} + 1 )))"
+              --ingest ws://ingest:8081/ws/ingest --api http://fleet-api:8080
+          resources:
+            requests: { cpu: 10m, memory: 8Mi }
+            limits: { memory: 32Mi }

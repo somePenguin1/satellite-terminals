@@ -1,0 +1,72 @@
+.ts-chart {
+  margin: 0;
+  min-width: 0;
+}
+
+.ts-chart figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-2);
+}
+
+.ts-title {
+  font-weight: 600;
+}
+
+.ts-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  font-size: var(--step--1);
+  color: var(--ink-2);
+}
+
+.ts-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ts-key strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.ts-swatch {
+  width: 12px;
+  height: 2px;
+}
+
+.ts-chart svg {
+  display: block;
+  overflow: visible;
+}
+
+.ts-grid {
+  stroke: var(--rule-soft);
+}
+
+.ts-axis {
+  stroke: var(--rule);
+}
+
+.ts-cursor {
+  stroke: var(--accent);
+  stroke-dasharray: 3 3;
+}
+
+.ts-tick {
+  font-size: 11px;
+  fill: var(--ink-3);
+  font-stretch: 90%;
+}
+
+.ts-empty {
+  display: grid;
+  place-items: center;
+  color: var(--ink-3);
+  border: 1px dashed var(--rule);
+  font-size: var(--step--1);
+}

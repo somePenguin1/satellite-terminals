@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simulator
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: simulator }
+  template:
+    metadata:
+      labels: { app: simulator }
+    spec:
+      containers:
+        - name: simulator
+          image: satfleet/simulator
+          args: ["-target", "dns:///ingest-headless:9090", "-api", "http://fleet-api:8080", "-exclude", "1-2", "-streams", "8"]
+          resources:
+            requests: { cpu: 100m, memory: 64Mi }
+            limits: { memory: 256Mi }

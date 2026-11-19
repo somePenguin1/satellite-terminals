@@ -1,0 +1,19 @@
+# build output
+node_modules/
+dist/
+build/
+target/
+coverage/
+*.out
+
+# test output
+playwright-report/
+test-results/
+loadtest.json
+
+# local environment
+.env
+.idea/
+.vscode/
+*.iml
+.DS_Store

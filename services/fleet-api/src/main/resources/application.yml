@@ -1,0 +1,54 @@
+spring:
+  application:
+    name: fleet-api
+  datasource:
+    url: jdbc:postgresql://localhost:5432/fleet
+    username: fleet
+    password: fleet
+    hikari:
+      maximum-pool-size: 10
+  flyway:
+    enabled: true
+  mvc:
+    problemdetails:
+      enabled: true
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+server:
+  port: 8080
+  shutdown: graceful
+  forward-headers-strategy: framework
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: fleet-api
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+fleet:
+  # Browser origins allowed to call the API directly (the production UI is same-origin behind nginx).
+  cors-origins: http://localhost:5173
+  scheduling:
+    enabled: true
+  alerts:
+    evaluation-interval: 15s
+  telemetry:
+    retention-days: 7
+  upsell:
+    # Average share of the plan's downlink used over the last 24 hours.
+    utilization-threshold: 0.65

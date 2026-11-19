@@ -1,0 +1,63 @@
+# Single-instance Postgres for dev/CI clusters. Production would use a managed service
+# or an operator (e.g. CloudNativePG) with replicas and backups.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-credentials
+type: Opaque
+stringData:
+  POSTGRES_USER: fleet
+  POSTGRES_PASSWORD: fleet
+  POSTGRES_DB: fleet
+  JDBC_URL: jdbc:postgresql://postgres:5432/fleet
+  DATABASE_URL: postgres://fleet:fleet@postgres:5432/fleet?sslmode=disable
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  selector: { app: postgres }
+  ports:
+    - port: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels: { app: postgres }
+  template:
+    metadata:
+      labels: { app: postgres }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          args: ["-c", "shared_buffers=256MB", "-c", "max_wal_size=2GB", "-c", "max_connections=200"]
+          envFrom:
+            - secretRef: { name: postgres-credentials }
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            exec: { command: ["pg_isready", "-U", "fleet", "-d", "fleet"] }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { memory: 1Gi }
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests: { storage: 5Gi }

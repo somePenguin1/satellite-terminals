@@ -1,0 +1,64 @@
+// Telemetry contract between satellite terminals (or the fleet simulator)
+// and the ingest service. Versioned by package: breaking changes go in v2.
+syntax = "proto3";
+
+package fleet.telemetry.v1;
+
+option go_package = "satfleet/ingest/internal/gen/telemetryv1;telemetryv1";
+option java_multiple_files = true;
+option java_package = "dev.satfleet.telemetry.v1";
+
+// Coarse link state as judged by the terminal's modem.
+enum LinkState {
+  LINK_STATE_UNSPECIFIED = 0;
+  LINK_STATE_UP = 1;
+  LINK_STATE_DEGRADED = 2;
+  LINK_STATE_DOWN = 3;
+}
+
+// One sample of link health from one terminal.
+message TelemetryReport {
+  // Fleet identifier, e.g. "SAT-00042".
+  string terminal_id = 1;
+  // Sample time on the terminal, Unix epoch milliseconds (UTC).
+  int64 timestamp_ms = 2;
+  // Monotonic per-boot sequence number; lets the backend spot gaps and replays.
+  uint64 seq = 3;
+  LinkState link_state = 4;
+
+  float latency_ms = 5;       // round-trip time to the gateway
+  float jitter_ms = 6;        // mean absolute RTT delta between probes
+  float packet_loss_pct = 7;  // 0-100 over the reporting window
+  float downlink_mbps = 8;    // measured throughput, not plan rate
+  float uplink_mbps = 9;
+  float snr_db = 10;          // signal-to-noise ratio at the modem
+  float obstruction_pct = 11; // share of sky view blocked, 0-100
+
+  string firmware_version = 12;
+}
+
+message TelemetryBatch {
+  repeated TelemetryReport reports = 1;
+}
+
+message IngestAck {
+  uint64 accepted = 1;
+  uint64 rejected = 2;
+  // Up to 20 sample rejection reasons, for debugging a misbehaving client.
+  repeated Rejection rejections = 3;
+}
+
+message Rejection {
+  string terminal_id = 1;
+  uint64 seq = 2;
+  string reason = 3;
+}
+
+service TelemetryIngest {
+  // Long-lived client stream: one per terminal, or one per simulator worker
+  // multiplexing many terminals. The server acks once when the client closes.
+  rpc StreamTelemetry(stream TelemetryReport) returns (IngestAck);
+
+  // Unary batch upload, for store-and-forward clients flushing a backlog.
+  rpc SendBatch(TelemetryBatch) returns (IngestAck);
+}

@@ -1,0 +1,70 @@
+/* Revenue reads as a sentence led by the figure, rather than a KPI tile. */
+.mrr-statement {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-4) 0 var(--space-5);
+  border-bottom: 1px solid var(--rule);
+}
+
+.mrr-figure {
+  font-size: var(--step-4);
+  font-weight: 700;
+  font-stretch: 122%;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.mrr-text {
+  font-size: var(--step-1);
+  color: var(--ink-2);
+  max-width: 60ch;
+}
+
+.bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.bars li {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr) 13rem;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--step--1);
+}
+
+.bar-label {
+  font-weight: 550;
+}
+
+.bar-track {
+  height: 12px;
+  background: var(--rule-soft);
+}
+
+.bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--ink);
+}
+
+.bar-value {
+  color: var(--ink-2);
+  text-align: right;
+}
+
+@media (max-width: 560px) {
+  .bars li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .bar-track {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}

@@ -1,0 +1,131 @@
+name: CD
+
+# After CI passes on main: build and publish images to GHCR, deploy the exact SHA to a fresh
+# Kubernetes cluster (kind) and smoke-test it, then optionally roll it to staging.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+jobs:
+  images:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { name: fleet-api, context: services/fleet-api, target: "" }
+          - { name: ingest, context: services/ingest, target: ingest }
+          - { name: simulator, context: services/ingest, target: simulator }
+          - { name: web, context: web, target: "" }
+          - { name: agent, context: agent, target: "" }
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
+      - id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/satfleet-${{ matrix.name }}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          target: ${{ matrix.target }}
+          push: true
+          tags: |
+            ${{ steps.image.outputs.name }}:${{ env.SHA }}
+            ${{ steps.image.outputs.name }}:latest
+          labels: org.opencontainers.image.revision=${{ env.SHA }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  deploy-kind:
+    name: Deploy to Kubernetes (kind) and smoke test
+    needs: images
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
+      - uses: helm/kind-action@v1
+        with:
+          cluster_name: satfleet
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Load release images into the cluster
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          for n in fleet-api ingest simulator web agent; do
+            docker pull "ghcr.io/$owner/satfleet-$n:$SHA"
+            kind load docker-image --name satfleet "ghcr.io/$owner/satfleet-$n:$SHA"
+          done
+      - name: Apply manifests pinned to this commit
+        run: |
+          kubectl apply -k "$(deploy/k8s/render-release.sh ci "ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" "$SHA")"
+      - name: Wait for rollout
+        run: |
+          kubectl -n satfleet rollout status statefulset/postgres --timeout=180s
+          for d in fleet-api ingest web simulator; do
+            kubectl -n satfleet rollout status deployment/$d --timeout=300s
+          done
+          kubectl -n satfleet rollout status statefulset/agent --timeout=120s
+      - name: Smoke test the running release
+        run: |
+          kubectl -n satfleet port-forward svc/web 3000:80 >/dev/null 2>&1 &
+          kubectl -n satfleet port-forward svc/ingest 8081:8081 >/dev/null 2>&1 &
+          sleep 5
+          curl -fsS http://localhost:3000/api/v1/fleet/summary | head -c 300; echo
+          # Telemetry must flow end to end: C agent over WebSocket, simulator over gRPC.
+          for i in $(seq 1 30); do
+            a=$(curl -fsS http://localhost:3000/api/v1/terminals/SAT-00001 | jq -r .metrics.transport)
+            s=$(curl -fsS http://localhost:3000/api/v1/terminals/SAT-00010 | jq -r .metrics.transport)
+            echo "SAT-00001 via $a, SAT-00010 via $s"
+            [ "$a" = "ws" ] && [ "$s" = "grpc" ] && break
+            sleep 5
+          done
+          [ "$a" = "ws" ] && [ "$s" = "grpc" ]
+          curl -fsS http://localhost:8081/metrics | grep -E '^ingest_reports_(accepted|persisted)'
+      - name: Cluster diagnostics
+        if: failure()
+        run: |
+          kubectl -n satfleet get pods -o wide
+          kubectl -n satfleet describe pods | tail -200
+          for d in fleet-api ingest simulator web; do kubectl -n satfleet logs deploy/$d --tail=100 || true; done
+
+  deploy-staging:
+    name: Deploy to staging
+    needs: deploy-kind
+    if: vars.STAGING_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
+      - name: Configure cluster credentials
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.STAGING_KUBECONFIG }}" | base64 -d > ~/.kube/config
+      - name: Apply manifests pinned to this commit
+        run: |
+          kubectl apply -k "$(deploy/k8s/render-release.sh staging "ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" "$SHA")"
+          for d in fleet-api ingest web simulator; do
+            kubectl -n satfleet-staging rollout status deployment/$d --timeout=300s
+          done

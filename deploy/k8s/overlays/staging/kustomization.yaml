@@ -1,0 +1,17 @@
+# Long-lived environment. CD sets image tags to the commit SHA with `kustomize edit set image`.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: satfleet-staging
+resources:
+  - ../../base
+patches:
+  - target: { kind: Namespace, name: satfleet }
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: satfleet-staging
+  - target: { kind: Ingress, name: web }
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: fleet-staging.example.com
